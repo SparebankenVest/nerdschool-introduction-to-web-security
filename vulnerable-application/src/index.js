@@ -5,6 +5,9 @@ import { addComment, getCandidates, getComments, getHasUserVoted, getUserIdByCre
 import bodyParser from 'body-parser';
 import logger from 'morgan';
 
+const asyncErrorHandler = (func) => (req, res, next) => 
+  Promise.resolve(func(req, res, next)).catch(next);
+
 const app = express();
 
 app.use(logger('dev'));
@@ -33,7 +36,7 @@ app.use((req, res, next) => {
   next()
 })
 
-app.post('/login', async (req, res) => {
+app.post('/login', asyncErrorHandler(async (req, res) => {
   const loggedInUserId = await getUserIdByCredentials(req.body);
   if (!loggedInUserId) {
     res.redirect(`/error?message=unable to log in user ${req.body.username}`);
@@ -44,19 +47,19 @@ app.post('/login', async (req, res) => {
   req.session.loggedInUsername = req.body.username;
   req.session.isLoggedIn = true;
   res.redirect("/voting");
-});
+}));
 
-app.get('/logout', async (req, res) => {
+app.get('/logout', asyncErrorHandler(async (req, res) => {
   req.session = null;
   res.clearCookie("session-cookie");
   res.redirect("/");
-});
+}));
 
 app.get('/error', (req, res) => {
   res.render('error', { message: req.query.message });
 });
 
-app.get('/internal', async (req, res) => {
+app.get('/internal', asyncErrorHandler(async (req, res) => {
   if (!req.session.isLoggedIn) {
     res.redirect('/');
     return;
@@ -65,9 +68,9 @@ app.get('/internal', async (req, res) => {
   const users = await getUsers();
 
   res.render('internal', { users });
-});
+}));
 
-app.get('/voting', async (req, res) => {
+app.get('/voting', asyncErrorHandler(async (req, res) => {
   if (!req.session.isLoggedIn) {
     res.redirect('/');
     return;
@@ -80,9 +83,9 @@ app.get('/voting', async (req, res) => {
   const [hasVoted, comments, candidates] = await Promise.all([hasUserVotedPromise, commentsPromise, candidatesPromise]);
 
   res.render('voting', { candidates, comments, hasVoted });
-});
+}));
 
-app.post('/add-comment', async (req, res) => {
+app.post('/add-comment', asyncErrorHandler(async (req, res) => {
   if (!req.session.isLoggedIn) {
     res.redirect('/');
     return;
@@ -90,9 +93,9 @@ app.post('/add-comment', async (req, res) => {
   await addComment(req.body);
   res.redirect('/voting');
 
-})
+}));
 
-app.post('/vote', async (req, res) => {
+app.post('/vote', asyncErrorHandler(async (req, res) => {
   if (!req.session.isLoggedIn) {
     res.redirect("/error");
     return;
@@ -103,7 +106,7 @@ app.post('/vote', async (req, res) => {
 
   await vote({ userId, candidateId });
   res.redirect("/voting");
-})
+}));
 
 app.get('/', (req, res) => {
   if (req.session.isLoggedIn) {
